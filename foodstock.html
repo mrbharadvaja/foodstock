@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LNG Supply Chain Executive Dashboard - Operational System</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass-card { 
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .status-critical { color: #ef4444; background: #fee2e2; }
+        .status-warning { color: #f59e0b; background: #fef3c7; }
+        .status-safe { color: #10b981; background: #dcfce7; }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #2563eb;
+            cursor: pointer;
+            box-shadow: 0 0 2px 0 rgba(0,0,0,0.5);
+        }
+        
+        .toast-notification {
+            transition: opacity 0.3s ease-in-out;
+        }
+        
+        /* Edit icon hover effect */
+        .edit-hover-group:hover .edit-icon {
+            opacity: 1;
+            color: #3b82f6;
+        }
+        .edit-icon {
+            opacity: 0.3;
+            transition: all 0.2s;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white shadow-2xl sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-blue-600 rounded-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-extrabold tracking-tight uppercase">LNG Food Logistics <span class="text-blue-400">Core</span></h1>
+                    
+                    <!-- DATE CONTROL PANEL -->
+                    <div class="flex items-center gap-2 mt-1">
+                        <div class="flex items-center bg-slate-800 rounded overflow-hidden border border-slate-700">
+                            <div id="systemDateDisplay" class="px-3 py-1 text-xs font-bold text-blue-300 tracking-widest">-- --- ----</div>
+                            <button onclick="advanceOneDay()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold tracking-widest uppercase transition flex items-center gap-1 border-l border-slate-700 active:bg-blue-700" title="Click to simulate passing 1 day">
+                                NEXT DAY ⏩
+                            </button>
+                        </div>
+                        <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest hidden md:inline">Auto-Decay Active</span>
+                    </div>
+
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4 md:gap-6">
+                <div class="text-right hidden sm:block">
+                    <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Last Stock Refill</div>
+                    <div id="lastRefillDateLabel" class="text-sm font-black text-emerald-400">02 APR 2026</div>
+                </div>
+                <div class="h-8 w-[1px] bg-slate-700 hidden sm:block"></div>
+                <div class="text-right">
+                    <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Global POB</div>
+                    <div id="pobLabel" class="text-xl font-black text-blue-400">1,200</div>
+                </div>
+                <div class="h-8 w-[1px] bg-slate-700"></div>
+                <div class="text-right">
+                    <button onclick="resetSystem()" class="text-[10px] bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded font-bold uppercase tracking-widest transition">Factory Reset</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-6 space-y-6">
+
+        <!-- Controls Section -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 glass-card rounded-2xl p-6 shadow-sm border-l-4 border-blue-600">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6">Scenario Planning & Expansion Simulation</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-4">
+                        <div class="flex justify-between">
+                            <label class="text-sm font-semibold text-slate-700">Project Population (POB)</label>
+                            <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">Editable</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <input type="range" id="pobSlider" min="1000" max="4000" step="100" value="1200" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                            <input type="number" id="pobInput" min="1000" max="4000" step="100" value="1200" class="w-24 border border-slate-300 rounded-lg p-2 text-sm font-bold text-center focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div class="flex justify-between text-[10px] text-slate-400 font-bold">
+                            <span>1000 (MIN)</span>
+                            <span>4000 (PEAK)</span>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <label class="text-sm font-semibold text-slate-700">Vessel Delay Impact (Days)</label>
+                        <div class="flex gap-2" id="delayContainer">
+                            <button onclick="updateDelay(0)" class="delay-btn flex-1 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold shadow-md transform transition active:scale-95">0</button>
+                            <button onclick="updateDelay(5)" class="delay-btn flex-1 py-2 rounded-lg bg-white border text-slate-600 text-xs font-bold hover:bg-slate-50">5</button>
+                            <button onclick="updateDelay(10)" class="delay-btn flex-1 py-2 rounded-lg bg-white border text-slate-600 text-xs font-bold hover:bg-slate-50">10</button>
+                            <button onclick="updateDelay(20)" class="delay-btn flex-1 py-2 rounded-lg bg-white border text-red-600 border-red-100 text-xs font-bold hover:bg-red-50">20+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-6 shadow-sm flex flex-col justify-between bg-slate-50/50">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Management Narrative</h3>
+                <div id="narrative" class="text-sm text-slate-600 italic leading-relaxed">
+                    Analyzing stock levels vs dynamically scaled burn rates...
+                </div>
+                <div class="mt-4 pt-4 border-t border-slate-200 flex justify-between items-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Current Safety Index</span>
+                    <span id="riskBadge" class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">OPTIMIZED</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- KPI Cards -->
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Editable KPI Card -->
+            <div class="glass-card p-5 rounded-2xl shadow-sm cursor-pointer edit-hover-group hover:bg-slate-50 transition relative" onclick="editTotalStock()" title="Click to manually edit Total Stock">
+                <div class="absolute top-4 right-4 text-slate-400 edit-icon">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                    Total On-Site Stock
+                </p>
+                <div class="flex items-end gap-2">
+                    <h2 id="kpi-stock" class="text-3xl font-black">--</h2>
+                    <span class="text-xs font-bold text-slate-400 mb-1 tracking-widest">KG</span>
+                </div>
+                <p class="text-[10px] mt-1 text-slate-500 font-medium">Auto-deducts daily (Click to Edit)</p>
+            </div>
+            
+            <div class="glass-card p-5 rounded-2xl shadow-sm border-l-4 border-blue-500">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Daily Burn (Scaled)</p>
+                <div class="flex items-end gap-2 text-blue-600">
+                    <h2 id="kpi-burn" class="text-3xl font-black">--</h2>
+                    <span class="text-xs font-bold opacity-70 mb-1 tracking-widest">KG / DAY</span>
+                </div>
+                <p class="text-[10px] mt-1 text-slate-500 font-medium">Formula: POB × 1.66 kg</p>
+            </div>
+            <div class="glass-card p-5 rounded-2xl shadow-sm">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Avg Safety Margin</p>
+                <div class="flex items-end gap-2">
+                    <h2 id="kpi-coverage" class="text-3xl font-black">--</h2>
+                    <span class="text-xs font-bold text-slate-400 mb-1 tracking-widest">DAYS</span>
+                </div>
+                <p class="text-[10px] mt-1 text-slate-500 font-medium">Total Stock ÷ Daily Burn</p>
+            </div>
+            <div class="glass-card p-5 rounded-2xl shadow-sm border-b-4 border-green-500" id="kpi-compliance-box">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">45-Day Buffer Health</p>
+                <div class="flex items-end gap-2">
+                    <h2 id="kpi-compliance" class="text-3xl font-black">--</h2>
+                </div>
+                <p class="text-[10px] mt-1 text-slate-500 font-medium">BP Compliance Threshold</p>
+            </div>
+            
+            <!-- Consumption Logic Transparency Panel -->
+            <div id="logicPanel" class="col-span-1 md:col-span-2 lg:col-span-4 bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-slate-700 shadow-inner mt-2">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="font-bold text-blue-800 uppercase tracking-widest text-[10px]">📊 Dynamic Consumption Transparency</h4>
+                    <span class="bg-blue-200 text-blue-800 px-2 py-1 rounded text-[9px] font-bold">1.66 MULTIPLIER ACTIVE</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-white p-3 rounded shadow-sm border border-blue-100">
+                        <span class="block text-[10px] font-bold text-slate-400 uppercase">Per Person Cons.</span>
+                        <strong class="text-lg text-slate-800">1.66 kg/day</strong>
+                        <p class="text-[9px] text-slate-400 mt-1">1990 kg ÷ 1200 POB</p>
+                    </div>
+                    <div class="bg-white p-3 rounded shadow-sm border border-blue-100">
+                        <span class="block text-[10px] font-bold text-slate-400 uppercase">Current POB</span>
+                        <strong id="logicPob" class="text-lg text-slate-800">--</strong>
+                        <p class="text-[9px] text-slate-400 mt-1">Active site population</p>
+                    </div>
+                    <div class="bg-white p-3 rounded shadow-sm border border-blue-100">
+                        <span class="block text-[10px] font-bold text-slate-400 uppercase">Current Total Stock</span>
+                        <strong id="logicTotalStock" class="text-lg text-slate-800">-- kg</strong>
+                        <p class="text-[9px] text-slate-400 mt-1">Current Stock = Prev - Burn + TopUp</p>
+                    </div>
+                    <div class="bg-blue-600 text-white p-3 rounded shadow-sm border border-blue-700 flex flex-col justify-center relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 opacity-20">
+                            <svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A12.014 12.014 0 0010.337 1a12.002 12.002 0 00-9.293 4.417c-.146.183-.284.375-.415.577-.04.062-.078.125-.116.188a1 1 0 001.381 1.381 9.998 9.998 0 0110.873-1.611 1 1 0 001.127-1.782l-2.564-1.124zM3.465 11.535a1 1 0 00-1.414 0c-.092.093-.183.187-.271.283A11.982 11.982 0 001 16c0 .487.029.967.086 1.44a1 1 0 101.987-.227A9.972 9.972 0 013 16c0-.98.142-1.928.406-2.827a1 1 0 00.059-1.638zm13.07 0a1 1 0 001.414 0c.092.093.183.187.271.283A11.982 11.982 0 0019 16c0 .487-.029.967-.086 1.44a1 1 0 10-1.987-.227A9.972 9.972 0 0117 16c0-.98-.142-1.928-.406-2.827a1 1 0 00-.059-1.638z" clip-rule="evenodd"></path></svg>
+                        </div>
+                        <span class="block text-[10px] font-bold text-blue-200 uppercase relative z-10">Daily Burn Formula</span>
+                        <strong class="text-xl relative z-10">POB × 1.66 = <span id="logicResult">--</span> kg</strong>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- DATA ENTRY SECTION -->
+        <section class="glass-card rounded-2xl p-6 shadow-sm border-t-4 border-emerald-500 bg-emerald-50/30">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-sm font-bold text-slate-700 uppercase tracking-widest">📦 Receive New Shipment / Top-Up</h3>
+                <div id="toast" class="toast-notification opacity-0 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded shadow">
+                    Stock Added Successfully!
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Select Material Description</label>
+                    <select id="itemSelect" class="w-full border-slate-300 rounded-lg p-3 text-sm font-semibold text-slate-700 bg-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500 border">
+                        <!-- Options populated via JS -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Quantity Received (KG)</label>
+                    <input type="number" id="receiveQty" min="1" placeholder="e.g. 5000" class="w-full border-slate-300 rounded-lg p-3 text-sm font-bold text-slate-700 bg-white shadow-sm focus:ring-emerald-500 focus:border-emerald-500 border">
+                </div>
+                <div>
+                    <button onclick="receiveNewStock()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg shadow-md transition transform active:scale-95">
+                        + ADD TO INVENTORY
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SHIPMENT LOG SECTION -->
+        <section class="glass-card rounded-2xl p-6 shadow-sm mb-6">
+            <h3 class="text-sm font-bold text-slate-700 uppercase tracking-widest mb-4">📝 Shipment & Top-Up Registry</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-100 text-[10px] font-bold text-slate-500 uppercase">
+                        <tr>
+                            <th class="p-3 rounded-tl-lg">Date Received</th>
+                            <th class="p-3">Material Name</th>
+                            <th class="p-3 text-right">Quantity (KG)</th>
+                            <th class="p-3 text-center rounded-tr-lg">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="shipmentLogTable" class="text-sm">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+                <div id="emptyLogState" class="text-center py-6 text-slate-400 text-xs italic hidden">
+                    No recent shipments logged. Add a top-up above to start tracking.
+                </div>
+            </div>
+        </section>
+
+        <!-- Visualization & Table -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 glass-card rounded-2xl p-6 shadow-sm">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Live Days of Coverage Analysis</h3>
+                        <p class="text-[10px] text-slate-400 mt-1 italic">Dashed line represents the mandatory 45-day compliance window.</p>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-blue-500"></span><span class="text-[10px] font-bold text-slate-400">COMPLIANT</span></div>
+                        <div class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-500"></span><span class="text-[10px] font-bold text-slate-400">CRITICAL</span></div>
+                    </div>
+                </div>
+                <div class="relative h-[450px]">
+                    <canvas id="coverageChart"></canvas>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-2xl shadow-sm overflow-hidden flex flex-col border-t-4 border-slate-900">
+                <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+                    <h3 class="text-xs font-bold uppercase tracking-widest">Live Supply Registry</h3>
+                    <span class="text-[9px] bg-slate-700 px-2 py-1 rounded">SORTED BY RISK</span>
+                </div>
+                <div class="flex-grow overflow-y-auto max-h-[500px]">
+                    <table class="w-full text-left">
+                        <thead class="sticky top-0 bg-white shadow-sm z-10">
+                            <tr class="text-[10px] font-bold text-slate-400 uppercase border-b">
+                                <th class="p-4">SKU Description</th>
+                                <th class="p-4 text-center">Current KG</th>
+                                <th class="p-4 text-center">Net Days</th>
+                            </tr>
+                        </thead>
+                        <tbody id="riskTable" class="text-sm">
+                            <!-- Dynamic Rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- CUSTOM MODAL UI SYSTEM -->
+    <div id="customModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 transform transition-all scale-95 opacity-0 duration-200" id="modalContent">
+            <h3 class="text-lg font-black text-slate-800 mb-2" id="modalTitle">Alert</h3>
+            <p class="text-sm text-slate-600 mb-6" id="modalMessage">Message goes here</p>
+            <div id="modalInputContainer" class="hidden mb-6">
+                <input type="number" id="modalInput" class="w-full border-slate-300 rounded-lg p-3 text-sm font-bold text-slate-700 bg-slate-50 border focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+            <div class="flex justify-end gap-3">
+                <button id="modalCancel" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">Cancel</button>
+                <button id="modalConfirm" class="px-4 py-2 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 transition">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // BASELINE DATA (Mapped directly to AVERAGE CONSUME D/DAY (Kg) from spreadsheet)
+        const BASE_INVENTORY = [
+            { name: "BEEF BLADE", stock: 15207.13, daily_burn: 236 },
+            { name: "WHOLE CHICKEN FROZEN", stock: 10802.00, daily_burn: 223 },
+            { name: "CHICKEN BONELES", stock: 14958.00, daily_burn: 240 },
+            { name: "ANY KIND OF FISH", stock: 6700.00, daily_burn: 126 },
+            { name: "SQUID FROZEN / CUMI", stock: 1090.00, daily_burn: 69 },
+            { name: "COOKING OIL", stock: 8760.00, daily_burn: 100 },
+            { name: "FLOUR / TEPUNG", stock: 1368.00, daily_burn: 36 },
+            { name: "TENDERLOIN FROZEN", stock: 1908.08, daily_burn: 43 },
+            { name: "SUGAR / GULA", stock: 1497.00, daily_burn: 20 },
+            { name: "FROZEN BROCCOLI", stock: 235.00, daily_burn: 26 },
+            { name: "FROZEN CARROTS / WORTEL", stock: 2202.00, daily_burn: 60 },
+            { name: "RICE", stock: 37900.00, daily_burn: 375 },
+            { name: "SIRUP", stock: 2076.00, daily_burn: 48 },
+            { name: "ICE CREAM", stock: 779.00, daily_burn: 4 },
+            { name: "COFFE", stock: 341.09, daily_burn: 2 },
+            { name: "TEA", stock: 1824.00, daily_burn: 12 },
+            { name: "KERUPUK", stock: 625.00, daily_burn: 50 },
+            { name: "SOSIS", stock: 33186.00, daily_burn: 50 },
+            { name: "TISSUE", stock: 5100.00, daily_burn: 48 },
+            { name: "TRASH BAG", stock: 6750.00, daily_burn: 192 },
+            { name: "HAND SOAP", stock: 260.00, daily_burn: 3 },
+            { name: "SUMA BREAK UP D3.5", stock: 310.00, daily_burn: 5 },
+            { name: "SUMA CAL XDS", stock: 660.00, daily_burn: 5 },
+            { name: "SUMA CAL XDS DESCALER", stock: 120.00, daily_burn: 5 },
+            { name: "SUMA J 512 D4 SANITIZER", stock: 0, daily_burn: 2 },
+            { name: "SUMA NOVA L6", stock: 210.00, daily_burn: 5 },
+            { name: "SUMA SHINE K2", stock: 0, daily_burn: 4 }
+        ];
+
+        let LIVE_INVENTORY = [];
+        let SHIPMENT_LOG = [];
+        let chart;
+        let delayValue = 0;
+        let currentSystemDate = new Date(2026, 3, 2); // System starts on 02 April 2026
+        
+        // CORE CONSUMPTION LOGIC CONSTANTS
+        const BASE_DAILY_BURN = 1990; // True sum of new daily_burn column
+        const BASE_POB = 1200;
+        const PER_PERSON_DAILY_BURN = BASE_DAILY_BURN / BASE_POB; // ~1.6583 to guarantee exact precision
+
+        // --- CUSTOM MODAL SYSTEM ---
+        let modalCallback = null;
+
+        function showModal(options) {
+            const modal = document.getElementById('customModal');
+            const content = document.getElementById('modalContent');
+            
+            document.getElementById('modalTitle').innerText = options.title || 'Alert';
+            document.getElementById('modalMessage').innerHTML = options.message || '';
+            
+            const inputContainer = document.getElementById('modalInputContainer');
+            const input = document.getElementById('modalInput');
+            
+            if (options.type === 'prompt') {
+                inputContainer.classList.remove('hidden');
+                input.value = options.defaultValue || '';
+                setTimeout(() => input.focus(), 150);
+            } else {
+                inputContainer.classList.add('hidden');
+            }
+
+            const btnCancel = document.getElementById('modalCancel');
+            if (options.type === 'alert') {
+                btnCancel.classList.add('hidden');
+            } else {
+                btnCancel.classList.remove('hidden');
+            }
+
+            const btnConfirm = document.getElementById('modalConfirm');
+            btnConfirm.className = `px-4 py-2 rounded-lg text-sm font-bold text-white transition ${options.confirmClass || 'bg-blue-600 hover:bg-blue-500'}`;
+            btnConfirm.innerText = options.confirmText || 'OK';
+
+            modalCallback = options.onConfirm;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('customModal');
+            const content = document.getElementById('modalContent');
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modalCallback = null;
+            }, 200);
+        }
+
+        document.getElementById('modalCancel').addEventListener('click', closeModal);
+        document.getElementById('modalConfirm').addEventListener('click', () => {
+            const inputVal = document.getElementById('modalInput').value;
+            const cb = modalCallback;
+            closeModal();
+            if (cb) cb(inputVal);
+        });
+        // --- END CUSTOM MODAL SYSTEM ---
+
+        // SYSTEM INITIALIZATION & MEMORY
+        function initializeSystem() {
+            // 1. Check Local Storage for saved operational data (Using v5 for auto-migration to correct formulas)
+            const savedData = localStorage.getItem('lng_food_inventory_v5');
+            const savedSystemDate = localStorage.getItem('lng_system_date_v5');
+            const savedRealDate = localStorage.getItem('lng_last_real_open_v5');
+            const savedPob = localStorage.getItem('lng_current_pob_v5');
+            const savedLog = localStorage.getItem('lng_shipment_log_v5');
+
+            // 2. Load Inventory or Reset to Base
+            if (savedData) {
+                LIVE_INVENTORY = JSON.parse(savedData);
+            } else {
+                LIVE_INVENTORY = JSON.parse(JSON.stringify(BASE_INVENTORY));
+            }
+
+            if (savedLog) {
+                SHIPMENT_LOG = JSON.parse(savedLog);
+            }
+
+            // 3. Set POB Controls
+            if (savedPob) {
+                document.getElementById('pobSlider').value = savedPob;
+                document.getElementById('pobInput').value = savedPob;
+            }
+
+            // Sync Inputs
+            document.getElementById('pobSlider').addEventListener('input', (e) => {
+                document.getElementById('pobInput').value = e.target.value;
+                updateDashboard();
+            });
+            document.getElementById('pobInput').addEventListener('input', (e) => {
+                let val = parseInt(e.target.value);
+                if(val >= 1000 && val <= 4000) {
+                    document.getElementById('pobSlider').value = val;
+                    updateDashboard();
+                }
+            });
+
+            // 4. Automated Daily Decay Logic
+            const realToday = new Date();
+            realToday.setHours(0, 0, 0, 0); 
+            
+            if (savedSystemDate && savedRealDate) {
+                currentSystemDate = new Date(savedSystemDate);
+                currentSystemDate.setHours(0, 0, 0, 0); 
+                
+                const lastRealOpen = new Date(savedRealDate);
+                lastRealOpen.setHours(0, 0, 0, 0);
+                
+                // Real world time difference check
+                const diffTime = realToday.getTime() - lastRealOpen.getTime();
+                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)); 
+                
+                if (diffDays > 0) {
+                    applyDailyDecay(diffDays);
+                    currentSystemDate.setDate(currentSystemDate.getDate() + diffDays);
+                }
+            } else {
+                currentSystemDate = new Date(2026, 3, 2); // Initial Start Date: 02 April 2026
+            }
+            
+            // Save both real world tracking date and UI system date
+            localStorage.setItem('lng_system_date_v5', currentSystemDate.toISOString());
+            localStorage.setItem('lng_last_real_open_v5', realToday.toISOString());
+            updateSystemDateUI();
+
+            populateDropdown();
+            if (!chart) initChart();
+            updateDashboard();
+        }
+
+        // NEXT DAY BUTTON LOGIC
+        function advanceOneDay() {
+            // Add 1 day to current system date
+            currentSystemDate.setDate(currentSystemDate.getDate() + 1);
+            
+            // Apply 1 day of decay
+            applyDailyDecay(1);
+            
+            // Save to storage
+            localStorage.setItem('lng_system_date_v5', currentSystemDate.toISOString());
+            
+            // Update UI
+            updateSystemDateUI();
+            updateDashboard();
+            
+            const toast = document.getElementById('toast');
+            toast.innerText = `System advanced to ${formatDate(currentSystemDate)}`;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 3000);
+            
+            setTimeout(() => toast.innerText = "Stock Added Successfully!", 3300);
+        }
+
+        // Date Format helper
+        function formatDate(date) {
+            const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+            return `${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${date.getFullYear()}`;
+        }
+
+        // Update System Date UI
+        function updateSystemDateUI() {
+            document.getElementById('systemDateDisplay').innerText = formatDate(currentSystemDate);
+        }
+
+        // AUTO-DECAY CALCULATION (Current Stock = Previous Stock - Daily Burn)
+        function applyDailyDecay(daysElapsed) {
+            const currentPob = parseInt(document.getElementById('pobSlider').value) || 1200;
+            const globalDailyBurn = currentPob * PER_PERSON_DAILY_BURN;
+            
+            const baseSum = LIVE_INVENTORY.reduce((sum, item) => sum + item.daily_burn, 0);
+
+            LIVE_INVENTORY.forEach(item => {
+                const itemShare = item.daily_burn / baseSum;
+                const scaledItemBurn = globalDailyBurn * itemShare;
+                
+                // Deduct stock (Stock = Prev - Burn)
+                item.stock = Math.max(0, item.stock - (scaledItemBurn * daysElapsed));
+            });
+            
+            saveSystemState();
+        }
+
+        function saveSystemState() {
+            localStorage.setItem('lng_food_inventory_v5', JSON.stringify(LIVE_INVENTORY));
+            localStorage.setItem('lng_current_pob_v5', document.getElementById('pobSlider').value);
+        }
+
+        function resetSystem() {
+            showModal({
+                title: 'Factory Reset',
+                message: 'Are you sure you want to factory reset all data? This will permanently erase new shipments and reset to the original base stock.',
+                type: 'confirm',
+                confirmClass: 'bg-red-600 hover:bg-red-500',
+                confirmText: 'Yes, Reset Data',
+                onConfirm: () => {
+                    localStorage.removeItem('lng_food_inventory_v5');
+                    localStorage.removeItem('lng_system_date_v5');
+                    localStorage.removeItem('lng_last_real_open_v5');
+                    localStorage.removeItem('lng_current_pob_v5');
+                    localStorage.removeItem('lng_shipment_log_v5');
+                    
+                    LIVE_INVENTORY = JSON.parse(JSON.stringify(BASE_INVENTORY));
+                    SHIPMENT_LOG = [];
+                    document.getElementById('pobSlider').value = 1200;
+                    document.getElementById('pobInput').value = 1200;
+                    
+                    currentSystemDate = new Date(2026, 3, 2); // Reset to 02 April 2026
+                    const realToday = new Date();
+                    realToday.setHours(0, 0, 0, 0);
+                    
+                    localStorage.setItem('lng_system_date_v5', currentSystemDate.toISOString());
+                    localStorage.setItem('lng_last_real_open_v5', realToday.toISOString());
+                    updateSystemDateUI();
+                    
+                    populateDropdown();
+                    renderShipmentLog();
+                    updateDashboard();
+                }
+            });
+        }
+
+        // MANUAL STOCK EDIT FUNCTION (Scales all items proportionally to hit the new Total Stock)
+        function editTotalStock() {
+            let currentTotal = LIVE_INVENTORY.reduce((sum, item) => sum + item.stock, 0);
+            showModal({
+                title: 'Edit Total Stock (KG)',
+                message: 'Enter the newly verified total site physical stock. <br><br><em>Note: This will proportionally scale all material line items to match this total.</em>',
+                type: 'prompt',
+                defaultValue: Math.round(currentTotal),
+                confirmText: 'Update Global Stock',
+                onConfirm: (userInput) => {
+                    if (userInput !== null && userInput.trim() !== "") {
+                        let newTotal = parseFloat(userInput);
+                        if (!isNaN(newTotal) && newTotal >= 0) {
+                            if (currentTotal > 0) {
+                                let ratio = newTotal / currentTotal;
+                                LIVE_INVENTORY.forEach(item => {
+                                    item.stock = item.stock * ratio;
+                                });
+                            } else {
+                                // Distribute evenly if current stock is dead zero
+                                const baseSum = LIVE_INVENTORY.reduce((sum, item) => sum + item.daily_burn, 0);
+                                LIVE_INVENTORY.forEach(item => {
+                                    const itemShare = item.daily_burn / baseSum;
+                                    item.stock = newTotal * itemShare;
+                                });
+                            }
+                            saveSystemState();
+                            updateDashboard();
+                        } else {
+                            showModal({ title: 'Validation Error', message: 'Invalid input. Please enter a valid number.', type: 'alert' });
+                        }
+                    }
+                }
+            });
+        }
+
+        // DATA ENTRY MODULE: RECEIVE STOCK
+        function populateDropdown() {
+            const select = document.getElementById('itemSelect');
+            select.innerHTML = '';
+            const sortedNames = [...LIVE_INVENTORY].sort((a,b) => a.name.localeCompare(b.name));
+            sortedNames.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.name;
+                opt.innerText = item.name;
+                select.appendChild(opt);
+            });
+        }
+
+        function receiveNewStock() {
+            const selectedName = document.getElementById('itemSelect').value;
+            const qtyInput = document.getElementById('receiveQty').value;
+            const qty = parseFloat(qtyInput);
+
+            if (!qty || qty <= 0) {
+                showModal({ title: 'Validation Error', message: 'Please enter a valid quantity in KG.', type: 'alert' });
+                return;
+            }
+
+            const itemIndex = LIVE_INVENTORY.findIndex(i => i.name === selectedName);
+            if (itemIndex > -1) {
+                LIVE_INVENTORY[itemIndex].stock += qty;
+                
+                const logEntry = {
+                    id: Date.now(),
+                    date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                    item: selectedName,
+                    qty: qty
+                };
+                SHIPMENT_LOG.unshift(logEntry);
+                localStorage.setItem('lng_shipment_log_v5', JSON.stringify(SHIPMENT_LOG));
+                
+                saveSystemState();
+                updateDashboard();
+                renderShipmentLog();
+                
+                document.getElementById('receiveQty').value = '';
+                const toast = document.getElementById('toast');
+                toast.classList.remove('opacity-0');
+                setTimeout(() => toast.classList.add('opacity-0'), 3000);
+            }
+        }
+
+        // SHIPMENT LOG RENDER & ACTIONS
+        function renderShipmentLog() {
+            const tbody = document.getElementById('shipmentLogTable');
+            const emptyState = document.getElementById('emptyLogState');
+            const refillLabel = document.getElementById('lastRefillDateLabel');
+            
+            tbody.innerHTML = '';
+            
+            if (SHIPMENT_LOG.length === 0) {
+                emptyState.classList.remove('hidden');
+                refillLabel.innerText = "02 APR 2026";
+            } else {
+                emptyState.classList.add('hidden');
+                
+                const mostRecentLog = SHIPMENT_LOG[0];
+                const d = new Date(mostRecentLog.id); 
+                refillLabel.innerText = formatDate(d);
+
+                SHIPMENT_LOG.forEach(log => {
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-slate-50 hover:bg-slate-50 transition";
+                    tr.innerHTML = `
+                        <td class="p-3 text-xs text-slate-500">${log.date}</td>
+                        <td class="p-3 font-semibold text-slate-700">${log.item}</td>
+                        <td class="p-3 text-right font-mono font-bold text-emerald-600">+${log.qty.toLocaleString()} KG</td>
+                        <td class="p-3 text-center">
+                            <button onclick="editShipment(${log.id})" class="text-blue-500 hover:text-blue-700 text-xs font-bold mr-3 transition">Edit</button>
+                            <button onclick="deleteShipment(${log.id})" class="text-red-500 hover:text-red-700 text-xs font-bold transition">Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        function editShipment(id) {
+            const index = SHIPMENT_LOG.findIndex(log => log.id === id);
+            if (index > -1) {
+                const log = SHIPMENT_LOG[index];
+                showModal({
+                    title: 'Edit Shipment Quantity',
+                    message: `Adjust the received quantity for <strong>${log.item}</strong>.<br>Current logged value: <strong>${log.qty} KG</strong>.`,
+                    type: 'prompt',
+                    defaultValue: log.qty,
+                    confirmText: 'Save Changes',
+                    onConfirm: (val) => {
+                        const newQtyStr = val;
+                        if (newQtyStr !== null && newQtyStr.trim() !== "") {
+                            const newQty = parseFloat(newQtyStr);
+                            if (!isNaN(newQty) && newQty >= 0) {
+                                const difference = newQty - log.qty;
+                                
+                                const itemIndex = LIVE_INVENTORY.findIndex(i => i.name === log.item);
+                                if (itemIndex > -1) {
+                                    LIVE_INVENTORY[itemIndex].stock = Math.max(0, LIVE_INVENTORY[itemIndex].stock + difference);
+                                }
+                                
+                                SHIPMENT_LOG[index].qty = newQty;
+                                
+                                localStorage.setItem('lng_shipment_log_v5', JSON.stringify(SHIPMENT_LOG));
+                                saveSystemState();
+                                renderShipmentLog();
+                                updateDashboard();
+                            } else {
+                                showModal({ title: 'Validation Error', message: 'Invalid quantity. Must be a positive number.', type: 'alert' });
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function deleteShipment(id) {
+            const index = SHIPMENT_LOG.findIndex(log => log.id === id);
+            if (index > -1) {
+                const log = SHIPMENT_LOG[index];
+                showModal({
+                    title: 'Delete Shipment',
+                    message: `Are you sure you want to delete the shipment record of <strong>${log.qty} KG</strong> for <strong>${log.item}</strong>?<br><br>This will permanently deduct the quantity from your current physical stock.`,
+                    type: 'confirm',
+                    confirmClass: 'bg-red-600 hover:bg-red-500',
+                    confirmText: 'Delete Record',
+                    onConfirm: () => {
+                        const itemIndex = LIVE_INVENTORY.findIndex(i => i.name === log.item);
+                        if (itemIndex > -1) {
+                            LIVE_INVENTORY[itemIndex].stock = Math.max(0, LIVE_INVENTORY[itemIndex].stock - log.qty);
+                        }
+                        
+                        SHIPMENT_LOG.splice(index, 1);
+                        
+                        localStorage.setItem('lng_shipment_log_v5', JSON.stringify(SHIPMENT_LOG));
+                        saveSystemState();
+                        renderShipmentLog();
+                        updateDashboard();
+                    }
+                });
+            }
+        }
+
+        // CHART INIT
+        function initChart() {
+            const ctx = document.getElementById('coverageChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: LIVE_INVENTORY.map(i => i.name),
+                    datasets: [{
+                        label: 'Total Available Days',
+                        data: [],
+                        backgroundColor: [],
+                        borderRadius: 4,
+                        barThickness: 10
+                    }, {
+                        label: '45-Day Buffer Line',
+                        data: Array(LIVE_INVENTORY.length).fill(45),
+                        type: 'line',
+                        borderColor: '#1e293b',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { 
+                            grid: { color: '#f1f5f9' }, 
+                            ticks: { font: { size: 9, weight: 'bold' } },
+                            title: { display: true, text: 'Safety Days (Live Remaining)', font: { size: 10, weight: 'bold' } }
+                        },
+                        y: { 
+                            grid: { display: false }, 
+                            ticks: { font: { size: 8, weight: '600' } } 
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateDelay(val) {
+            delayValue = val;
+            const btns = document.querySelectorAll('.delay-btn');
+            btns.forEach(b => {
+                b.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+                b.classList.add('bg-white', 'text-slate-600', 'border');
+            });
+            event.target.classList.add('bg-blue-600', 'text-white', 'shadow-md');
+            event.target.classList.remove('bg-white', 'text-slate-600', 'border');
+            updateDashboard();
+        }
+
+        // MAIN DASHBOARD LOGIC (Auto-recalculates everything on inputs)
+        function updateDashboard() {
+            const pob = parseInt(document.getElementById('pobSlider').value);
+            document.getElementById('pobLabel').innerText = pob.toLocaleString();
+            
+            const globalDailyBurn = pob * PER_PERSON_DAILY_BURN;
+            
+            saveSystemState();
+
+            let totalStock = 0;
+            let criticalItems = [];
+            let chartData = [];
+            let chartColors = [];
+
+            const table = document.getElementById('riskTable');
+            table.innerHTML = "";
+
+            const baseSum = LIVE_INVENTORY.reduce((sum, item) => sum + item.daily_burn, 0);
+
+            const sortedInventory = [...LIVE_INVENTORY].sort((a, b) => {
+                const burnA = globalDailyBurn * (a.daily_burn / baseSum);
+                const burnB = globalDailyBurn * (b.daily_burn / baseSum);
+                const coverA = (a.stock / burnA);
+                const coverB = (b.stock / burnB);
+                return coverA - coverB;
+            });
+
+            sortedInventory.forEach(item => {
+                const itemShare = item.daily_burn / baseSum;
+                const itemDailyBurn = globalDailyBurn * itemShare;
+                
+                const coverDays = itemDailyBurn > 0 ? (item.stock / itemDailyBurn) - delayValue : 999;
+                const totalDays = Math.max(0, parseFloat(coverDays.toFixed(1)));
+
+                totalStock += item.stock;
+                
+                let color = '#3b82f6';
+                if (totalDays < 30) {
+                    color = '#ef4444';
+                    criticalItems.push(item.name);
+                } else if (totalDays < 45) {
+                    color = '#f59e0b';
+                }
+                
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-slate-50 hover:bg-slate-50 transition";
+                tr.innerHTML = `
+                    <td class="p-4 font-semibold text-slate-700 text-[11px] leading-tight">${item.name}</td>
+                    <td class="p-4 text-center text-xs font-mono text-slate-500">${Math.round(item.stock).toLocaleString()}</td>
+                    <td class="p-4 text-center">
+                        <span class="px-2 py-1 rounded font-bold text-[10px] ${totalDays < 45 ? 'status-critical' : 'status-safe'}">
+                            ${totalDays}d
+                        </span>
+                    </td>
+                `;
+                table.appendChild(tr);
+            });
+
+            LIVE_INVENTORY.forEach(item => {
+                const itemShare = item.daily_burn / baseSum;
+                const itemDailyBurn = globalDailyBurn * itemShare;
+                const coverDays = itemDailyBurn > 0 ? (item.stock / itemDailyBurn) - delayValue : 999;
+                const totalDays = Math.max(0, parseFloat(coverDays.toFixed(1)));
+                
+                chartData.push(totalDays);
+                chartColors.push(totalDays < 30 ? '#ef4444' : (totalDays < 45 ? '#f59e0b' : '#3b82f6'));
+            });
+
+            document.getElementById('kpi-stock').innerText = Math.round(totalStock).toLocaleString();
+            document.getElementById('kpi-burn').innerText = Math.round(globalDailyBurn).toLocaleString();
+            
+            const avgCover = globalDailyBurn > 0 ? (totalStock / globalDailyBurn) - delayValue : 0;
+            document.getElementById('kpi-coverage').innerText = Math.max(0, avgCover).toFixed(1);
+            
+            const compliantItems = chartData.filter(d => d >= 45).length;
+            const compliancePct = Math.round((compliantItems / LIVE_INVENTORY.length) * 100);
+            document.getElementById('kpi-compliance').innerText = compliancePct + "%";
+            
+            const compBox = document.getElementById('kpi-compliance-box');
+            compBox.className = `glass-card p-5 rounded-2xl shadow-sm border-b-4 ${compliancePct < 80 ? 'border-red-500' : 'border-green-500'}`;
+
+            const riskBadge = document.getElementById('riskBadge');
+            let riskLevel = "STABLE";
+            let riskClass = "bg-green-100 text-green-700";
+
+            if (criticalItems.length > 0) {
+                riskLevel = "ACTION REQ";
+                riskClass = "bg-red-100 text-red-700 pulse animate-pulse";
+            } else if (compliancePct < 100) {
+                riskLevel = "CAUTION";
+                riskClass = "bg-yellow-100 text-yellow-700";
+            }
+            riskBadge.innerText = riskLevel;
+            riskBadge.className = `px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${riskClass}`;
+
+            const narrative = `With POB set to <strong>${pob}</strong>, daily site burn rate is <strong>${Math.round(globalDailyBurn)} kg</strong>. 
+                <br>Physical stock records reflect automated daily deductions and recent receipts.
+                ${compliancePct < 100 ? `Currently, <strong>${LIVE_INVENTORY.length - compliantItems} materials</strong> fall below the 45-day safety threshold.` : 'All monitored materials exceed 45-day buffer.'}`;
+            document.getElementById('narrative').innerHTML = narrative;
+
+            document.getElementById('logicPob').innerText = pob.toLocaleString();
+            document.getElementById('logicResult').innerText = Math.round(globalDailyBurn).toLocaleString();
+            document.getElementById('logicTotalStock').innerText = Math.round(totalStock).toLocaleString() + " kg";
+
+            chart.data.datasets[0].data = chartData;
+            chart.data.datasets[0].backgroundColor = chartColors;
+            chart.update();
+        }
+
+        window.onload = () => {
+            initializeSystem();
+            renderShipmentLog();
+        };
+    </script>
+</body>
+</html>
